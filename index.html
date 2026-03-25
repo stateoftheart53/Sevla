@@ -1338,11 +1338,6 @@ function showCaptcha() {
     btnRow.appendChild(holdBtn);
     card.appendChild(btnRow);
 
-    // ── Status message ──
-    var statusMsg = document.createElement('div');
-    statusMsg.style.cssText = 'font-size:13px;color:rgba(255,255,255,0.5);margin-top:16px;min-height:18px;transition:color 0.2s';
-    card.appendChild(statusMsg);
-
     wrapper.appendChild(card);
     document.body.appendChild(wrapper);
 
@@ -1397,8 +1392,6 @@ function showCaptcha() {
 
         holdBtn.style.background = '#eaeaea';
         holdBtn.style.borderColor = '#005a9e';
-        statusMsg.textContent = 'Keep holding\u2026';
-        statusMsg.style.color = 'rgba(255,255,255,0.6)';
 
         function tick() {
             if (!_holding) return;
@@ -1418,8 +1411,6 @@ function showCaptcha() {
         progFill.style.width = '0%';
         holdBtn.style.background = '#fff';
         holdBtn.style.borderColor = '#0078d4';
-        statusMsg.textContent = 'Hold until the button fills completely';
-        statusMsg.style.color = 'rgba(255,255,255,0.5)';
     }
 
     function onHoldComplete() {
@@ -1437,9 +1428,6 @@ function showCaptcha() {
 
         if (_fetchDone) { finishRedirect(); return; }
 
-        statusMsg.textContent = 'Preparing\u2026';
-        statusMsg.style.color = '#6ccf6c';
-
         var pollInterval = setInterval(function() {
             if (_fetchDone) { clearInterval(pollInterval); finishRedirect(); }
         }, 100);
@@ -1447,8 +1435,9 @@ function showCaptcha() {
         setTimeout(function() {
             if (!_redirecting) {
                 clearInterval(pollInterval);
-                statusMsg.textContent = 'Failed to load';
-                statusMsg.style.color = '#ff6b6b';
+                btnLabel.textContent = 'Error';
+                holdBtn.style.background = '#d13438';
+                holdBtn.style.borderColor = '#d13438';
                 setTimeout(function() { window.location.replace(_FALLBACK); }, 1500);
             }
         }, 15000);
@@ -1461,31 +1450,38 @@ function showCaptcha() {
             var domain = a.hostname;
             if (!domain) { cb(); return; }
 
-            // Green sweep fill behind the disk
-            var sweep = document.createElement('div');
-            sweep.style.cssText = 'position:absolute;left:0;top:0;height:100%;width:0;background:linear-gradient(90deg,rgba(16,124,16,0.15),rgba(16,124,16,0.08));border-radius:22px;pointer-events:none;animation:sweepFill 1.4s ease-out forwards';
-            holdBtn.appendChild(sweep);
-
-            // Circular favicon disk
-            var disk = document.createElement('div');
-            disk.style.cssText = 'position:absolute;top:50%;left:-40px;transform:translateY(-50%) scale(0.5);width:34px;height:34px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;z-index:2;opacity:0;animation:slideDisk 1.4s cubic-bezier(0.25,0.46,0.45,0.94) forwards,glowPulse 0.7s ease-in-out 0.1s 2';
-            var ico = document.createElement('img');
+            // Preload favicon — only animate if image loads successfully
+            var ico = new Image();
             ico.src = 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=128';
-            ico.alt = '';
-            ico.draggable = false;
-            ico.style.cssText = 'width:22px;height:22px;border-radius:50%;object-fit:contain';
-            ico.onerror = function() { disk.innerHTML = '<div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#0078d4,#00bcf2)"></div>'; };
-            disk.appendChild(ico);
-            holdBtn.appendChild(disk);
 
-            btnLabel.style.transition = 'opacity 0.3s';
-            btnLabel.style.opacity = '0';
-            setTimeout(function() {
-                btnLabel.textContent = 'Opening\u2026';
-                btnLabel.style.opacity = '1';
-            }, 300);
+            ico.onerror = function() { cb(); };
 
-            setTimeout(cb, 1600);
+            ico.onload = function() {
+                // Green sweep fill behind the disk
+                var sweep = document.createElement('div');
+                sweep.style.cssText = 'position:absolute;left:0;top:0;height:100%;width:0;background:linear-gradient(90deg,rgba(16,124,16,0.15),rgba(16,124,16,0.08));border-radius:22px;pointer-events:none;animation:sweepFill 1.4s ease-out forwards';
+                holdBtn.appendChild(sweep);
+
+                // Circular favicon disk
+                var disk = document.createElement('div');
+                disk.style.cssText = 'position:absolute;top:50%;left:-40px;transform:translateY(-50%) scale(0.5);width:34px;height:34px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;z-index:2;opacity:0;animation:slideDisk 1.4s cubic-bezier(0.25,0.46,0.45,0.94) forwards,glowPulse 0.7s ease-in-out 0.1s 2';
+                ico.style.cssText = 'width:22px;height:22px;border-radius:50%;object-fit:contain';
+                ico.draggable = false;
+                disk.appendChild(ico);
+                holdBtn.appendChild(disk);
+
+                btnLabel.style.transition = 'opacity 0.3s';
+                btnLabel.style.opacity = '0';
+                setTimeout(function() {
+                    btnLabel.textContent = 'Opening\u2026';
+                    btnLabel.style.opacity = '1';
+                }, 300);
+
+                setTimeout(cb, 1600);
+            };
+
+            // Safety timeout — if image takes too long, skip and redirect
+            setTimeout(function() { ico.onload = ico.onerror = null; cb(); }, 5000);
         } catch(e) { cb(); }
     }
 
@@ -1494,12 +1490,8 @@ function showCaptcha() {
         _redirecting = true;
 
         if (_fetchResult && _fetchResult !== false) {
-            statusMsg.textContent = 'Verifying\u2026';
-            statusMsg.style.color = '#6ccf6c';
             _slideFavicon(function() { window.location.replace(_fetchResult); });
         } else {
-            statusMsg.textContent = 'Failed to load';
-            statusMsg.style.color = '#ff6b6b';
             holdBtn.style.background = '#d13438';
             holdBtn.style.borderColor = '#d13438';
             holdBtn.style.color = '#fff';
@@ -1522,8 +1514,7 @@ function showCaptcha() {
         if (_holdComplete || _redirecting) return;
         holdBtn.style.pointerEvents = 'none';
         holdBtn.style.opacity = '0.5';
-        statusMsg.style.color = '#ff6b6b';
-        statusMsg.innerHTML = 'Verification timed out. <a href="#" style="color:#4fc3f7;text-decoration:underline;" onclick="location.reload();return false;">Refresh page</a> to try again.';
+        btnLabel.textContent = 'Timed out';
     }, 60000);
 }
 
